@@ -21,6 +21,8 @@ obj.author = "Alfred Schilken <alfred@schilken.de>"
 obj.homepage = "https://github.com/Hammerspoon/Spoons"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 obj.provider_url = "https://www.deepl.com/translator"
+obj.tab_after_pasting_text = true
+
 
 -- User-configurable variables
 
@@ -84,6 +86,7 @@ obj.webview = nil
 --- Returns:
 ---  * The Translate object
 function obj:translatePopup(text)
+  self.prevFocusedWindow = hs.window.focusedWindow()
 	self.modal_keys = hs.hotkey.modal.new()
 	self.modal_keys:bind({ "cmd", "alt", "ctrl" }, "O", hs.fnutils.partial(self.modalOKCallback, self))
 	self.modal_keys:enter()
@@ -96,24 +99,26 @@ function obj:translatePopup(text)
 			:allowTextEntry(true)
 			:windowStyle(self.popup_style)
 			:closeOnEscape(self.popup_close_on_escape)
+      :shadow(true)
 	end
 	self.webview:url(self.provider_url):bringToFront():show()
 	self.webview:hswindow():focus()
-	hs.timer.doAfter(1, function()
+	hs.timer.doAfter(3, function()
 		hs.eventtap.keyStroke({ "cmd" }, "v")
 	end)
-	hs.timer.doAfter(1.5, function()
-		hs.eventtap.keyStroke({}, "tab")
-	end)
 
-	--[[   hs.timer.doAfter(5, function() 
-         hs.eventtap.keyStroke({"cmd"}, "a")
-         hs.eventtap.keyStroke({"cmd"}, "c")
-         if self.popup_close_after_copy then
-            hs.eventtap.keyStroke({"cmd"}, "w")
-         end
-      end)
---]]
+  if self.tab_after_pasting_text then
+	  hs.timer.doAfter(3.5, function()
+		  hs.eventtap.keyStroke({}, "tab")
+	  end)
+  end
+
+  self.webview:windowCallback(function(action)
+    if action == "closing" then
+      self.prevFocusedWindow:focus()
+    end
+  end)
+
 	return self
 end
 
@@ -238,17 +243,23 @@ function obj:bindHotkeys(mapping)
 	obj.mapping = mapping
 end
 
---- Translate:providerUrl(url)
---- Method
---- Define the translate provider (default is DeepL)
----
---- Parameters:
----  * url - A String of translate provider, default is obj.provider_url = "https://www.deepl.com/translator"
----
 --- Examples:
---- spoon.Translate:providerUrl("https://translate.google.com.br/?hl=pt-BR")
-function obj:providerUrl(url)
-	self.provider_url = url
+--- spoon.Translate:config(
+---   {
+---     translate = { { "ctrl", "alt" }, "t" },
+---     provider_url = "https://translate.google.com.br/?hl=pt-BR", 
+---     tab_after_pasting_text = false
+---   })
+function obj:config(config)
+  if config.translate ~= nil then
+    self:bindHotkeys({translate = config.translate})
+  end
+  if config.provider_url ~= nil then
+    self.provider_url = config.provider_url
+  end
+  if config.tab_after_pasting_text ~= nil then 
+    self.tab_after_pasting_text = config.tab_after_pasting_text
+  end
 end
 
 return obj
